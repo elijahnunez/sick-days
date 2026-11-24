@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sick Day Diary</title>
+<!--
+  ~*~ SICK DAY DIARY ~*~
+  SETUP (one time, done by you, never shown to people using the app):
+  1. Supabase Dashboard -> SQL Editor -> run setup.sql (creates the table + privacy rules).
+  2. Project Settings -> API: copy the Project URL and the publishable key into the two lines below.
+  The publishable key is meant to live in web pages; the row-level security rules in setup.sql
+  are what keep each person's records private. Never put the secret / service_role key here.
+-->
+<script>
+  window.SICK_DIARY_CONFIG = {
+    SUPABASE_URL: "https://sewftfbyioxizvarhnjq.supabase.co",
+    SUPABASE_KEY: "sb_publishable_TqhykUp2ipe4o4qGPQQkFg_hNmOSbts"
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+/*
+  VOICE: a 1999 GeoCities homepage made for you while you're stuck in bed.
+  IDEA: a personal homepage diary — every "post" is a time you got sick, start to finish.
+  PICTURE: the timeline itself, a dotted ribbon of hearts down the page.
+  COLOUR/TYPE: bubblegum textured ground, grape-purple WordArt, link-red underlines; Times all the way.
+  LAYOUT: one centered column, beveled buttons, everything stacks on a phone.
+*/
+:root{--pink:#f9b8dc;--hot:#e0459b;--grape:#8a3fc7;--grape-d:#5b1f8c;--link:#a3002b;--paper:#fff0f8;--ink:#4a1240}
+*{box-sizing:border-box;min-width:0}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;color:var(--ink);font:17px/1.45 "Times New Roman",Times,Georgia,serif;background-color:var(--pink);
+  background-image:radial-gradient(rgba(255,255,255,.55) 1px,transparent 1.4px),radial-gradient(rgba(214,90,160,.28) 1px,transparent 1.4px),
+  repeating-linear-gradient(45deg,rgba(255,255,255,.12) 0 2px,transparent 2px 5px),repeating-linear-gradient(-45deg,rgba(200,70,150,.08) 0 2px,transparent 2px 6px);
+  background-size:7px 7px,11px 11px,auto,auto;background-position:0 0,3px 5px,0 0,0 0;overflow-x:clip}
+.wrap{max-width:760px;margin:0 auto;padding:18px 14px 60px;text-align:center}
+a{color:var(--link)}
+.title{margin:6px 0 0;line-height:1}
+.title .small{display:block;font:italic 700 clamp(26px,6vw,40px)/1 "Times New Roman",serif;color:#000;letter-spacing:.04em;text-shadow:2px 2px 0 #fff}
+.title .big{display:inline-block;font:italic 900 clamp(44px,12.5vw,92px)/.95 Impact,"Arial Black","Times New Roman",sans-serif;color:var(--grape);transform:skewX(-8deg);
+  text-shadow:1px 1px 0 #c79cf0,2px 2px 0 #6d2aa6,3px 3px 0 #6d2aa6,4px 4px 0 #5b1f8c,5px 5px 0 #4a1873,6px 6px 0 #3a1260,8px 9px 6px rgba(60,0,60,.35)}
+.sparkle{color:#fff;text-shadow:0 0 4px var(--hot);font-size:26px;animation:tw 1.6s infinite}
+@keyframes tw{50%{opacity:.25}}
+.welcome{color:var(--grape-d);font-weight:700;font-size:20px;margin:14px auto 4px;max-width:30em}
+.marq{background:#fff;border:2px inset #f6c;color:var(--hot);font-weight:700;font-style:italic;margin:10px auto;max-width:560px;overflow:hidden;white-space:nowrap}
+.marq span{display:inline-block;padding:3px 0 3px 100%;animation:mq 16s linear infinite}
+@keyframes mq{to{transform:translateX(-100%)}}
+.btn{font:700 16px/1.1 "Comic Sans MS","Chalkboard SE","Trebuchet MS",sans-serif;color:#3b0b33;cursor:pointer;min-height:44px;padding:10px 16px;border:3px outset #fbd0ea;border-radius:2px;
+  background:linear-gradient(#ffd6ee,#f58fc6 55%,#e769ad);text-shadow:1px 1px 0 #ffe6f5;box-shadow:0 0 0 2px #fff,0 0 0 3px #c9579a}
+.btn:active,.btn[aria-pressed=true]{border-style:inset;background:linear-gradient(#e769ad,#f58fc6)}
+.btn[aria-pressed=true]{color:#fff;text-shadow:1px 1px 0 #7a1050}
+.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.chip input:focus-visible+span{outline:3px dashed var(--grape);outline-offset:3px}
+.btn.purple{background:linear-gradient(#e6cdfb,#b77ce9 55%,#9a52d8);border-color:#e6cdfb;box-shadow:0 0 0 2px #fff,0 0 0 3px #7b39b5}
+.btn.tiny{min-height:36px;padding:6px 10px;font-size:14px}
+.nav{display:inline-flex;flex-wrap:wrap;gap:12px;justify-content:center;margin:16px 0 8px;padding:8px;background:#fff;border:2px ridge #f6c}
+.tabs{display:flex;gap:10px;justify-content:center;margin:6px 0 2px}
+.new{display:inline-block;font:900 11px/1 Arial,sans-serif;color:#ff0;background:#e00;padding:2px 4px;border:1px solid #900;transform:rotate(-6deg);animation:bl 1s steps(1) infinite;vertical-align:middle;white-space:nowrap}
+@keyframes bl{50%{color:#e00;background:#ff0}}
+.box{background:var(--paper);border:4px double var(--hot);margin:18px auto;padding:16px;text-align:left;max-width:640px;box-shadow:5px 5px 0 rgba(138,63,199,.35)}
+.box h2{margin:0 0 10px;text-align:center;font:italic 700 26px/1.1 "Times New Roman",serif;color:var(--grape)}
+.box h2::before,.box h2::after{content:" \2665 ";color:var(--hot)}
+label{display:block;font-weight:700;color:var(--grape-d);margin:12px 0 4px}
+input[type=text],input[type=email],input[type=password],input[type=date],input[type=url],textarea,select{width:100%;font:16px "Times New Roman",serif;padding:9px;border:2px inset #f0a8d0;background:#fff;color:var(--ink);border-radius:0}
+textarea{min-height:70px;resize:vertical}
+.row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.check{display:flex;gap:8px;align-items:center;font-weight:700;color:var(--hot);margin:10px 0 0}
+.check input{width:22px;height:22px;accent-color:var(--hot)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{position:relative;margin:0;font-weight:400}
+.chip input{position:absolute;opacity:0}
+.chip span{display:inline-block;padding:7px 11px;border:2px outset #fbd0ea;background:#ffe3f2;cursor:pointer;font-size:15px;color:var(--ink)}
+.chip input:checked+span{background:var(--hot);color:#fff;border-style:inset}
+.hearts{display:flex;gap:4px}
+.hearts button{font-size:30px;line-height:1;background:none;border:0;cursor:pointer;color:#e7b6d3;padding:4px;min-width:44px;min-height:44px}
+.hearts button.on{color:var(--hot);text-shadow:1px 1px 0 var(--grape-d)}
+.sevword{font-style:italic;color:var(--grape-d);font-weight:400}
+.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:16px;justify-content:center}
+.msg{text-align:center;font-weight:700;color:var(--link);min-height:1.4em;margin:8px 0 0}
+.hint{font-size:14px;color:#7a3a6e}
+.mode{display:inline-block;background:#fff;border:2px dotted var(--grape);padding:3px 10px;font-size:14px;margin-top:6px}
+.counter{display:inline-flex;gap:2px;background:#000;padding:4px;border:2px inset #999;vertical-align:middle}
+.counter b{font:700 20px/1 "Courier New",monospace;color:#3f3;background:#111;padding:2px 4px}
+/* timeline */
+.tl{position:relative;max-width:640px;margin:10px auto;text-align:left;padding-left:34px}
+.tl::before{content:"";position:absolute;left:13px;top:6px;bottom:6px;border-left:4px dotted var(--grape)}
+.month{position:relative;margin:22px 0 8px;font:italic 700 20px/1.2 "Times New Roman",serif;color:#fff;background:var(--grape);display:inline-block;padding:4px 12px;border:2px outset #c79cf0}
+.month::before{content:"\2665";position:absolute;left:-38px;top:-3px;font-size:30px;color:var(--hot);text-shadow:1px 1px 0 #fff,-1px -1px 0 #fff}
+.ep{position:relative;background:#fff;border:3px ridge #f6a5d2;padding:12px 14px;margin:10px 0}
+.ep::before{content:"";position:absolute;left:-27px;top:18px;width:12px;height:12px;border-radius:50%;background:#fff;border:3px solid var(--hot)}
+.ep.now{border-color:#ff5fa8;box-shadow:0 0 0 3px #fff,0 0 12px 3px #ff7bbf}
+.ep .dates{font-weight:700;color:var(--grape-d);font-size:18px}
+.ep .len{display:inline-block;white-space:nowrap;background:#ffe3f2;border:1px solid var(--hot);padding:0 6px;font-weight:700;font-size:15px;margin-left:4px}
+.ep .ttl{display:block;font-size:19px;font-weight:700;color:var(--link)}
+.ep .sev{color:var(--hot);letter-spacing:1px;white-space:nowrap}
+.ep .sev i{color:#e7b6d3;font-style:normal}
+.tags{margin:6px 0 0;display:flex;flex-wrap:wrap;gap:4px}
+.tags span{font-size:14px;background:#f3e6ff;border:1px dashed var(--grape);padding:1px 7px}
+.ep p{margin:6px 0 0}
+.ep .ctl{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.gap{font-size:14px;font-style:italic;color:var(--grape-d);margin:-2px 0 0 4px}
+.empty{text-align:center;font-style:italic;padding:22px;background:#fff;border:3px dashed var(--hot)}
+/* records */
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;text-align:center;margin-bottom:12px}
+.stats div{background:#fff;border:2px ridge #f6a5d2;padding:8px 4px}
+.stats b{display:block;font-size:clamp(24px,7vw,34px);color:var(--grape);line-height:1.1}
+.stats small{font-size:13px}
+.bars{margin:6px 0 14px}
+.bar{display:grid;grid-template-columns:8.5em minmax(0,1fr) 2.2em;gap:8px;align-items:center;margin:4px 0;font-size:15px}
+.bar .track{background:#fff;border:1px solid #f0a8d0;height:16px}
+.bar .fill{height:100%;background:repeating-linear-gradient(45deg,var(--hot) 0 6px,#f58fc6 6px 12px)}
+.bar .n{text-align:right;font-weight:700}
+.callout{background:#fff;border:2px dashed var(--grape);padding:10px 12px;margin:10px 0;font-size:16px}
+table{width:100%;border-collapse:collapse;background:#fff;font-size:15px}
+th,td{border:1px solid #f0a8d0;padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--grape);color:#fff;font-style:italic}
+td.num{text-align:right;white-space:nowrap}
+td.dt{white-space:nowrap}
+.filter{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;margin:6px 0}
+.filter select{width:auto}
+hr.rainbow{border:0;height:6px;margin:24px auto;max-width:600px;background:linear-gradient(90deg,#f6c,#c9f,#9cf,#9fc,#ff9,#fc9,#f6c)}
+footer{font-size:14px;color:var(--grape-d)}
+[hidden]{display:none!important}
+@media(max-width:600px){.row{grid-template-columns:minmax(0,1fr)}.box{padding:12px}.nav{display:flex}
+  table{font-size:14px}.stack thead{display:none}.stack tr{display:grid;padding-block:8px;border-bottom:3px double var(--hot)}
+  .stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:6.5em;text-align:start;white-space:normal}
+  .stack td::before{content:attr(data-l);float:inline-start;width:6em;margin-inline-start:-6.5em;font-weight:700;color:var(--grape-d)}
+  .stack td:empty{display:none}.bar{grid-template-columns:7em minmax(0,1fr) 2em}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="title"><span class="small"><span class="sparkle">&#10022;</span> ~ my ~ <span class="sparkle">&#10022;</span></span><span class="big">Sick Day Diary</span></h1>
+  <p class="welcome">Welcome to my sick diary &mdash; where I keep track of every time I got sick so the doctor believes me. LOL</p>
+  <div class="marq" aria-hidden="true"><span>&#9829; drink water &#9829; rest up &#9829; write down your symptoms &#9829; you've got this babe &#9829; get well soon &#9829;</span></div>
+  <div><span class="mode" id="modeLabel">Loading&hellip;</span></div>
+
+  <section class="box" id="setupBox" hidden>
+    <h2>Almost Ready</h2>
+    <p class="hint" id="setupMsg">This diary isn't connected to its database yet. Open index.html and fill in SUPABASE_URL and SUPABASE_KEY at the top.</p>
+  </section>
+
+  <section class="box" id="authBox" hidden>
+    <h2>Sign In</h2>
+    <form id="authForm">
+      <label for="aEmail">E-mail</label><input id="aEmail" type="email" autocomplete="email" required>
+      <label for="aPass">Password</label><input id="aPass" type="password" autocomplete="current-password" minlength="6" required>
+      <div class="actions"><button class="btn purple" type="submit" data-act="in">Sign In</button><button class="btn" type="submit" data-act="up">Sign Up <span class="new">NEW!</span></button></div>
+    </form>
+    <p class="msg" id="authMsg" role="status"></p>
+  </section>
+
+  <main id="app" hidden>
+    <nav class="nav" aria-label="Main">
+      <button class="btn" id="newBtn" type="button">+ I'm Sick</button>
+      <button class="btn purple" id="importBtn" type="button">Import Notes</button>
+      <button class="btn" id="outBtn" type="button">Sign Out</button>
+    </nav>
+    <div>You've been sick <span class="counter" id="counter" aria-label="number of times sick"></span> times</div>
+    <p class="msg" id="appMsg" role="status"></p>
+
+    <section class="box" id="formBox" hidden>
+      <h2 id="formTitle">Uh oh, Sick Again?</h2>
+      <form id="epForm">
+        <div class="row">
+          <div><label for="fStart">Date started</label><input id="fStart" type="date" required></div>
+          <div><label for="fEnd">Date ended</label><input id="fEnd" type="date"></div>
+        </div>
+        <label class="check"><input type="checkbox" id="fOngoing"> Still sick right now</label>
+        <label for="fTitle">Name it (optional)</label>
+        <input id="fTitle" type="text" list="titleList" placeholder="Throat thing, cold, flu&hellip;" maxlength="80"><datalist id="titleList"></datalist>
+        <label>Symptoms</label><div class="chips" id="chips"></div>
+        <label for="fOther">Other symptoms (comma separated)</label><input id="fOther" type="text" placeholder="itchy eyes, rash">
+        <label id="sevLbl">How bad? <span class="sevword" id="sevWord"></span></label>
+        <div class="hearts" id="hearts" role="radiogroup" aria-labelledby="sevLbl"></div>
+        <label for="fNotes">Notes</label><textarea id="fNotes" placeholder="Meds, doctor visits, temp, what helped&hellip;"></textarea>
+        <div class="actions"><button class="btn purple" type="submit" id="saveBtn">Save &hearts;</button><button class="btn" type="button" id="cancelBtn">Cancel</button></div>
+      </form>
+    </section>
+
+    <section class="box" id="importBox" hidden>
+      <h2>Import Notes</h2>
+      <p class="hint">One sickness per line, starting with the date it started: <b>2/5 : some tonsil swelling and fever</b>. Add a year like <b>2/5/25</b> if it's not this year. I'll pick out the symptoms and keep your words as the note. End dates can be added after.</p>
+      <label for="impYear">Year for dates without one</label><input id="impYear" type="text" inputmode="numeric" maxlength="4">
+      <label for="impText">Your notes</label><textarea id="impText" style="min-height:150px">2/5 : some tonsil swelling and fever
+2/23 -throat issue again
+7/10-- ...throat/body/feverish
+8/31- congestion/ weakness
+11/23- sore throat + body aches</textarea>
+      <div class="actions"><button class="btn" type="button" id="previewBtn">Preview</button><button class="btn purple" type="button" id="doImport">Import &hearts;</button><button class="btn" type="button" id="impCancel">Cancel</button></div>
+      <div id="impPreview"></div>
+    </section>
+
+    <div class="tabs" role="group" aria-label="View">
+      <button class="btn" type="button" id="tabTl" aria-pressed="true">Timeline</button>
+      <button class="btn" type="button" id="tabRec" aria-pressed="false">Records</button>
+    </div>
+    <hr class="rainbow">
+    <div class="filter"><label for="fYear" style="margin:0">Year:</label><select id="fYear"></select></div>
+
+    <div id="tlView"><div class="tl" id="timeline"></div></div>
+
+    <div id="recView" hidden>
+      <section class="box" style="max-width:700px">
+        <h2>My Records</h2>
+        <div class="stats" id="stats"></div>
+        <div id="callout"></div>
+        <label style="margin-top:4px">Symptoms that keep coming back</label>
+        <div class="bars" id="bars"></div>
+        <table class="stack"><thead><tr><th>Started</th><th>Ended</th><th>Days</th><th>Symptoms</th><th>Notes</th></tr></thead><tbody id="recRows"></tbody></table>
+        <div class="actions"><button class="btn purple" id="copyBtn" type="button">Copy for Doctor</button></div>
+      </section>
+    </div>
+  </main>
+
+  <hr class="rainbow">
+  <footer>Best viewed in Netscape Navigator 4.0 at 800&times;600 &#9829; Not medical advice &mdash; if you're really sick, call your doctor!</footer>
+</div>
+
+<script>
+{
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const SYMPTOMS = ["Sore throat","Swollen tonsils","Fever","Chills","Body aches","Weakness","Fatigue","Congestion","Runny nose","Cough","Headache","Nausea","Stomach ache","Dizziness"];
+const KEYWORDS = [[/tonsil/,"Swollen tonsils"],[/throat/,"Sore throat"],[/fever/,"Fever"],[/chill/,"Chills"],[/body|ach(e|y)/,"Body aches"],[/weak/,"Weakness"],[/tired|fatigue|exhaust/,"Fatigue"],[/congest|stuffy/,"Congestion"],[/runny|sneez/,"Runny nose"],[/cough/,"Cough"],[/headache|migraine/,"Headache"],[/nause|vomit|throw/,"Nausea"],[/stomach|tummy/,"Stomach ache"],[/dizz/,"Dizziness"]];
+const SEV = ["","Meh, a little off","Kinda yucky","Pretty sick","Really bad","Worst EVER"];
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+/* dates are plain YYYY-MM-DD strings */
+const pad = n => String(n).padStart(2,"0");
+const today = () => { const d=new Date(); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()) };
+const toD = s => { const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d) };
+const diff = (a,b) => Math.round((toD(b)-toD(a))/864e5);
+const nice = (s,withYear) => { const d=toD(s); return MONTHS[d.getMonth()]+" "+d.getDate()+(withYear?", "+d.getFullYear():"") };
+const lengthOf = e => e.end_date ? diff(e.start_date,e.end_date)+1 : e.ongoing ? diff(e.start_date,today())+1 : null;
+
+let sb = null, store = null, eps = [], editingId = null, severity = 0, view = "tl", entered = false;
+
+const cloudStore = {
+  async list(){ const {data,error}=await sb.from("sick_episodes").select("*").order("start_date",{ascending:false}); if(error) throw error; return data },
+  async add(rows){ const {error}=await sb.from("sick_episodes").insert(rows); if(error) throw error },
+  async update(id,e){ const {error}=await sb.from("sick_episodes").update(e).eq("id",id); if(error) throw error },
+  async remove(id){ const {error}=await sb.from("sick_episodes").delete().eq("id",id); if(error) throw error }
+};
+
+function show(which){ for (const id of ["setupBox","authBox","app"]) $(id).hidden = id !== which }
+function say(el,t){ $(el).textContent = t || "" }
+
+async function boot(){
+  const cfg = window.SICK_DIARY_CONFIG || {};
+  if (!cfg.SUPABASE_URL || !cfg.SUPABASE_KEY) { $("modeLabel").textContent = "Not set up yet"; return show("setupBox") }
+  if (!window.supabase) { $("modeLabel").textContent = "Couldn't reach the database"; say("setupMsg","Couldn't load the database library. Check your internet connection and reload."); return show("setupBox") }
+  try { sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_KEY) }
+  catch(e) { $("modeLabel").textContent = "Setup problem"; say("setupMsg","The SUPABASE_URL or SUPABASE_KEY at the top of the file isn't right: "+e.message); return show("setupBox") }
+  store = cloudStore;
+  // setTimeout: never await Supabase calls inside the auth callback (it can lock up)
+  sb.auth.onAuthStateChange((_e,session) => setTimeout(() => {
+    if (session) enterApp(session.user.email);
+    else { entered = false; show("authBox"); $("modeLabel").textContent = "Please sign in ♥" }
+  },0));
+}
+async function enterApp(email){
+  $("modeLabel").textContent = "Signed in as "+email+" ♥";
+  show("app");
+  if (!entered) { entered = true; await refresh() }
+}
+
+async function refresh(){
+  try { eps = await store.list() } catch(e) { eps = []; say("appMsg","Couldn't load: "+e.message+(/relation|does not exist|schema cache/i.test(e.message)?" (did you run setup.sql?)":"")) }
+  eps.sort((a,b)=> b.start_date.localeCompare(a.start_date));
+  render();
+}
+
+/* ---------- render ---------- */
+function filtered(){ const y=$("fYear").value; return y ? eps.filter(e=>e.start_date.startsWith(y)) : eps }
+function sevHtml(v){ return v ? '<span class="sev" title="'+esc(SEV[v])+'">'+"♥".repeat(v)+'<i>'+"♥".repeat(5-v)+'</i></span>' : "" }
+function symsOf(e){ return e.symptoms||[] }
+
+function render(){
+  $("counter").innerHTML = [...String(eps.length).padStart(4,"0")].map(d=>"<b>"+d+"</b>").join("");
+  $("titleList").innerHTML = [...new Set(eps.map(e=>e.title).filter(Boolean))].map(t=>'<option value="'+esc(t)+'">').join("");
+  const years = [...new Set(eps.map(e=>e.start_date.slice(0,4)))].sort().reverse();
+  const f = $("fYear"), cur = f.value;
+  f.innerHTML = '<option value="">All years</option>' + years.map(y=>'<option>'+esc(y)+'</option>').join("");
+  f.value = years.includes(cur) ? cur : "";
+  view === "tl" ? renderTimeline() : renderRecords();
+}
+
+function renderTimeline(){
+  const list = filtered();
+  if (!list.length) { $("timeline").innerHTML = '<div class="empty">Nothing here yet! Tap <b>+ I\'m Sick</b> when it starts, or <b>Import Notes</b> to bring in your old list. &#9829;</div>'; return }
+  let html = "", lastM = "";
+  list.forEach((e,i) => {
+    const d = toD(e.start_date), m = d.toLocaleDateString(undefined,{month:"long",year:"numeric"});
+    if (m !== lastM) { html += '<div class="month">'+esc(m)+'</div>'; lastM = m }
+    const len = lengthOf(e);
+    const range = e.end_date ? nice(e.start_date)+" &rarr; "+nice(e.end_date) : e.ongoing ? nice(e.start_date)+" &rarr; now" : nice(e.start_date);
+    const lenTxt = e.ongoing ? "day "+len : len ? len+(len===1?" day":" days") : "end not recorded";
+    const idx = eps.indexOf(e), prev = eps[idx+1];
+    const gap = prev ? diff(prev.end_date || prev.start_date, e.start_date) : null;
+    html += '<article class="ep'+(e.ongoing?" now":"")+'">'
+      + (e.title ? '<span class="ttl">'+esc(e.title)+'</span>' : "")
+      + '<span class="dates">'+range+'</span> <span class="len">'+lenTxt+'</span> '
+      + (e.ongoing ? '<span class="new">SICK NOW</span> ' : "") + sevHtml(e.severity)
+      + (symsOf(e).length ? '<div class="tags">'+symsOf(e).map(s=>'<span>'+esc(s)+'</span>').join("")+'</div>' : "")
+      + (e.notes ? '<p>'+esc(e.notes).replace(/\n/g,"<br>")+'</p>' : "")
+      + (gap != null ? '<p class="gap">'+(gap<=0?"Started before the last one ended":gap+" days after the last time")+'</p>' : "")
+      + '<div class="ctl">'+(e.ongoing?'<button class="btn tiny purple" data-better="'+esc(e.id)+'">I feel better!</button>':"")
+      + '<button class="btn tiny" data-edit="'+esc(e.id)+'">Edit</button><button class="btn tiny" data-del="'+esc(e.id)+'">Delete</button></div></article>';
+  });
+  $("timeline").innerHTML = html;
+}
+
+function renderRecords(){
+  const list = filtered();
+  const lens = list.map(lengthOf).filter(n=>n!=null);
+  const asc = list.slice().reverse();
+  const gaps = asc.slice(1).map((e,i)=>diff(asc[i].start_date,e.start_date));
+  const avgGap = gaps.length ? Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length) : null;
+  $("stats").innerHTML =
+    '<div><b>'+list.length+'</b><small>times sick</small></div>'
+   +'<div><b>'+(lens.length?lens.reduce((a,b)=>a+b,0):"&ndash;")+'</b><small>sick days'+(lens.length<list.length?" (recorded)":"")+'</small></div>'
+   +'<div><b>'+(avgGap!=null?avgGap:"&ndash;")+'</b><small>avg days between</small></div>';
+  const counts = {};
+  list.forEach(e=>symsOf(e).forEach(s=>counts[s]=(counts[s]||0)+1));
+  const top = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  $("bars").innerHTML = top.length ? top.map(([s,n])=>'<div class="bar"><span>'+esc(s)+'</span><span class="track"><span class="fill" style="display:block;width:'+(n/list.length*100)+'%"></span></span><span class="n">'+n+'</span></div>').join("") : '<p class="hint">No symptoms logged yet.</p>';
+  const throat = list.filter(e=>symsOf(e).some(s=>/throat|tonsil/i.test(s))).length;
+  $("callout").innerHTML = list.length>=3 && throat/list.length>=0.5
+    ? '<div class="callout">&#9829; <b>Pattern:</b> '+throat+' of your '+list.length+' times involved your throat or tonsils. That\'s worth bringing up with a doctor &mdash; it may be nothing, but repeat throat/tonsil trouble is something they look at.</div>' : "";
+  $("recRows").innerHTML = list.length ? list.map(e=>{
+    const len = lengthOf(e);
+    return '<tr><td class="dt" data-l="Started">'+esc(nice(e.start_date,true))+'</td><td class="dt" data-l="Ended">'+(e.end_date?esc(nice(e.end_date,true)):e.ongoing?"still sick":"not recorded")+'</td><td class="num" data-l="Days">'+(len??"&mdash;")+'</td><td data-l="Symptoms">'+esc(symsOf(e).join(", "))+'</td><td data-l="Notes">'+esc([e.title,e.notes].filter(Boolean).join(" — "))+'</td></tr>' }).join("")
+    : '<tr><td colspan="5" style="text-align:center;font-style:italic">No records yet.</td></tr>';
+}
+
+/* ---------- form ---------- */
+function setSeverity(v){ severity=v; $("sevWord").textContent = v ? "— "+SEV[v] : ""; [...$("hearts").children].forEach((b,i)=>{ b.classList.toggle("on",i<v); b.setAttribute("aria-checked",String(i+1===v)) }) }
+function syncOngoing(){ const on=$("fOngoing").checked; $("fEnd").disabled=on; if(on) $("fEnd").value="" }
+function openForm(e){
+  editingId = e ? e.id : null;
+  $("importBox").hidden = true;
+  $("formTitle").textContent = e ? "Edit Record" : "Uh oh, Sick Again?";
+  $("fStart").value = e ? e.start_date : today();
+  $("fEnd").value = e && e.end_date ? e.end_date : "";
+  $("fOngoing").checked = e ? !!e.ongoing : true; syncOngoing();
+  $("fTitle").value = e ? e.title||"" : "";
+  const syms = e ? symsOf(e) : [];
+  document.querySelectorAll("#chips input").forEach(c=>c.checked=syms.includes(c.value));
+  $("fOther").value = syms.filter(s=>!SYMPTOMS.includes(s)).join(", ");
+  setSeverity(e ? e.severity||0 : 0);
+  $("fNotes").value = e ? e.notes||"" : "";
+  $("formBox").hidden = false; $("formBox").scrollIntoView({behavior:"smooth",block:"start"});
+}
+$("chips").innerHTML = SYMPTOMS.map((s,i)=>'<label class="chip"><input type="checkbox" value="'+esc(s)+'" id="sym'+i+'"><span>'+esc(s)+'</span></label>').join("");
+$("hearts").innerHTML = [1,2,3,4,5].map(i=>'<button type="button" role="radio" aria-label="'+esc(SEV[i])+'" data-sev="'+i+'">♥</button>').join("");
+$("hearts").addEventListener("click", ev=>{ const b=ev.target.closest("button"); if(b){ const v=+b.dataset.sev; setSeverity(v===severity?0:v) } });
+$("fOngoing").addEventListener("change", syncOngoing);
+$("fEnd").addEventListener("input", ()=>{ if($("fEnd").value){ $("fOngoing").checked=false; syncOngoing() } });
+
+$("epForm").addEventListener("submit", async ev=>{
+  ev.preventDefault();
+  const start=$("fStart").value, end=$("fOngoing").checked?null:($("fEnd").value||null);
+  if (end && end < start) return say("appMsg","The end date is before the start date — check those!");
+  const syms=[...document.querySelectorAll("#chips input:checked")].map(c=>c.value).concat($("fOther").value.split(",").map(s=>s.trim()).filter(Boolean));
+  const row={start_date:start,end_date:end,ongoing:$("fOngoing").checked,title:$("fTitle").value.trim()||null,symptoms:[...new Set(syms)],severity:severity||null,notes:$("fNotes").value.trim()||null};
+  $("saveBtn").disabled=true;
+  try { editingId ? await store.update(editingId,row) : await store.add(row); $("formBox").hidden=true; say("appMsg", editingId?"Record updated ♥":"Saved! Feel better soon ♥"); await refresh() }
+  catch(e){ say("appMsg","Couldn't save: "+e.message) }
+  $("saveBtn").disabled=false;
+});
+$("cancelBtn").addEventListener("click", ()=>{ $("formBox").hidden=true });
+$("newBtn").addEventListener("click", ()=>openForm(null));
+
+$("timeline").addEventListener("click", async ev=>{
+  const ed=ev.target.closest("[data-edit]"), del=ev.target.closest("[data-del]"), bt=ev.target.closest("[data-better]");
+  if (ed) openForm(eps.find(e=>String(e.id)===ed.dataset.edit));
+  if (bt) { try { await store.update(bt.dataset.better,{end_date:today(),ongoing:false}); say("appMsg","Yay! Glad you're feeling better ♥"); await refresh() } catch(e){ say("appMsg","Couldn't update: "+e.message) } }
+  if (del) {
+    if (del.dataset.armed!=="1") { del.dataset.armed="1"; del.textContent="Really delete?"; setTimeout(()=>{ if(del.isConnected){ del.dataset.armed=""; del.textContent="Delete" } },4000); return }
+    try { await store.remove(del.dataset.del); say("appMsg","Record deleted."); await refresh() } catch(e){ say("appMsg","Couldn't delete: "+e.message) }
+  }
+});
+
+/* ---------- import ---------- */
+function parseNotes(text, year){
+  const out=[], bad=[];
+  for (const raw of text.split(/\n/)) {
+    const line=raw.trim(); if(!line) continue;
+    const m=line.match(/^(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\s*[-:.–—,\s]*(.*)$/);
+    if(!m){ bad.push(line); continue }
+    let y=m[3]?+m[3]:+year; if(y<100) y+=2000;
+    const mo=+m[1], d=+m[2];
+    if(mo<1||mo>12||d<1||d>31||!y){ bad.push(line); continue }
+    const start=y+"-"+pad(mo)+"-"+pad(d);
+    const txt=m[4].replace(/^[\s.\-:]+/,"").trim(), low=txt.toLowerCase();
+    const syms=[...new Set(KEYWORDS.filter(([re])=>re.test(low)).map(([,s])=>s))];
+    out.push({start_date:start,end_date:null,ongoing:start===today(),title:null,symptoms:syms,severity:null,notes:txt||null});
+  }
+  return {out,bad};
+}
+function preview(){
+  const {out,bad}=parseNotes($("impText").value,$("impYear").value);
+  const dupes=out.filter(r=>eps.some(e=>e.start_date===r.start_date)).length;
+  $("impPreview").innerHTML = '<table style="margin-top:12px"><thead><tr><th>Start</th><th>Symptoms found</th></tr></thead><tbody>'
+    + out.map(r=>'<tr><td class="dt">'+esc(nice(r.start_date,true))+(r.ongoing?' <span class="new">NOW</span>':"")+'</td><td>'+esc(r.symptoms.join(", ")||"(none matched — kept as note)")+'</td></tr>').join("")
+    + '</tbody></table>' + (bad.length?'<p class="msg">Couldn\'t read: '+bad.map(esc).join(" / ")+'</p>':"")
+    + (dupes?'<p class="hint">'+dupes+' of these start on a date you already have &mdash; they\'ll be skipped.</p>':"");
+  return out.filter(r=>!eps.some(e=>e.start_date===r.start_date));
+}
+$("importBtn").addEventListener("click", ()=>{ $("formBox").hidden=true; $("impYear").value=$("impYear").value||new Date().getFullYear(); $("importBox").hidden=false; preview(); $("importBox").scrollIntoView({behavior:"smooth",block:"start"}) });
+$("previewBtn").addEventListener("click", preview);
+$("impCancel").addEventListener("click", ()=>{ $("importBox").hidden=true });
+$("doImport").addEventListener("click", async ()=>{
+  const rows=preview(); if(!rows.length) return say("appMsg","Nothing new to import.");
+  $("doImport").disabled=true;
+  try { await store.add(rows); $("importBox").hidden=true; say("appMsg","Imported "+rows.length+" records ♥ Tap Edit on any to add its end date."); await refresh() }
+  catch(e){ say("appMsg","Couldn't import: "+e.message) }
+  $("doImport").disabled=false;
+});
+
+/* ---------- views + copy ---------- */
+function setView(v){ view=v; $("tabTl").setAttribute("aria-pressed",String(v==="tl")); $("tabRec").setAttribute("aria-pressed",String(v==="rec")); $("tlView").hidden=v!=="tl"; $("recView").hidden=v!=="rec"; render() }
+$("tabTl").addEventListener("click", ()=>setView("tl"));
+$("tabRec").addEventListener("click", ()=>setView("rec"));
+$("fYear").addEventListener("change", render);
+$("copyBtn").addEventListener("click", async ()=>{
+  const list=filtered().slice().reverse();
+  if(!list.length) return say("appMsg","Nothing to copy yet.");
+  const lines=["My sickness log"+($("fYear").value?" ("+$("fYear").value+")":""),""];
+  for(const e of list){
+    const len=lengthOf(e);
+    lines.push(nice(e.start_date,true)+" to "+(e.end_date?nice(e.end_date,true):e.ongoing?"now (still sick)":"end not recorded")+(len?" — "+len+" day"+(len===1?"":"s"):"")+(e.severity?" — severity "+e.severity+"/5":""));
+    if(symsOf(e).length) lines.push("  Symptoms: "+symsOf(e).join(", "));
+    if(e.title||e.notes) lines.push("  Notes: "+[e.title,e.notes].filter(Boolean).join(" — "));
+  }
+  try { await navigator.clipboard.writeText(lines.join("\n")); say("appMsg","Copied! Paste it into a message or your patient portal ♥") }
+  catch(e){ say("appMsg","Your browser blocked copying — try again.") }
+});
+
+/* ---------- auth + connect ---------- */
+let authAct="in";
+$("authForm").addEventListener("click", ev=>{ const b=ev.target.closest("[data-act]"); if(b) authAct=b.dataset.act });
+$("authForm").addEventListener("submit", async ev=>{
+  ev.preventDefault();
+  const email=$("aEmail").value.trim(), password=$("aPass").value;
+  say("authMsg", authAct==="up"?"Signing you up…":"Signing in…");
+  const r = authAct==="up" ? await sb.auth.signUp({email,password}) : await sb.auth.signInWithPassword({email,password});
+  if(r.error) return say("authMsg",r.error.message);
+  say("authMsg", authAct==="up" && !r.data.session ? "Check your e-mail to confirm, then sign in ♥" : "");
+});
+$("outBtn").addEventListener("click", async ()=>{
+  await sb.auth.signOut(); eps=[]; $("formBox").hidden=true; $("importBox").hidden=true;
+});
+
+boot();
+}
+</script>
+</body>
+</html>
