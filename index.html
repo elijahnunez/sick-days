@@ -446,7 +446,7 @@ $("authForm").addEventListener("submit", async ev=>{
   ev.preventDefault();
   const email=$("aEmail").value.trim(), password=$("aPass").value;
   say("authMsg", authAct==="up"?"Signing you up…":"Signing in…");
-  const r = authAct==="up" ? await sb.auth.signUp({email,password}) : await sb.auth.signInWithPassword({email,password});
+  const r = authAct==="up" ? await sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin+location.pathname}}) : await sb.auth.signInWithPassword({email,password});
   if(r.error) return say("authMsg",r.error.message);
   say("authMsg", authAct==="up" && !r.data.session ? "Check your e-mail to confirm, then sign in ♥" : "");
 });
